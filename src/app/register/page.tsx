@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+} from 'firebase/auth';
 import { auth, provider } from '@/lib/firebase';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { FcGoogle } from 'react-icons/fc';
 import { Moon, Sun, Loader2 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -30,22 +33,20 @@ export default function LoginPage() {
     setTheme(newTheme);
   };
 
-  const getErrorMessage = (code: string) => {
+  const formatError = (code: string) => {
     switch (code) {
+      case 'auth/email-already-in-use':
+        return 'This email is already registered.';
       case 'auth/invalid-email':
         return 'Please enter a valid email address.';
-      case 'auth/user-not-found':
-        return 'No account found with this email.';
-      case 'auth/wrong-password':
-        return 'The password you entered is incorrect.';
-      case 'auth/too-many-requests':
-        return 'Too many failed attempts. Please try again later.';
+      case 'auth/weak-password':
+        return 'Password must be at least 6 characters.';
       default:
-        return 'Login failed. Please try again.';
+        return 'Registration failed. Please try again.';
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -56,25 +57,24 @@ export default function LoginPage() {
     }
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast.success('Welcome back! Redirecting...');
+      await createUserWithEmailAndPassword(auth, email, password);
+      toast.success('Account created! Redirecting...');
       router.push('/home');
     } catch (err: any) {
-      const message = getErrorMessage(err.code);
-      toast.error(message);
+      toast.error(formatError(err.code));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
       await signInWithPopup(auth, provider);
-      toast.success('Signed in with Google!');
+      toast.success('Signed up with Google!');
       router.push('/home');
-    } catch (err) {
-      toast.error('Google sign-in failed. Please try again.');
+    } catch {
+      toast.error('Google sign-up failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +83,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-[#10002B] transition-colors">
       <Toaster position="top-center" />
-      
+
       {/* Theme Toggle */}
       <button
         onClick={toggleTheme}
@@ -94,15 +94,15 @@ export default function LoginPage() {
       </button>
 
       <div className="flex items-start justify-center pt-10 md:pt-20 px-4">
-        <div className="w-full max-w-md bg-white dark:bg-[#1f1f1f] p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 space-y-6 animate-fadeIn">
+        <div className="max-w-md w-full bg-white dark:bg-[#1f1f1f] p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 space-y-6 animate-fadeIn">
           <h1 className="text-4xl font-extrabold text-center text-pink-600 dark:text-pink-400">
             Shop<span className="text-gray-900 dark:text-white">Easy</span>
           </h1>
           <h2 className="text-lg font-medium text-center text-gray-700 dark:text-gray-300">
-            Sign in to your account
+            Create your account
           </h2>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-4">
             <input
               type="email"
               placeholder="Enter your email"
@@ -113,7 +113,7 @@ export default function LoginPage() {
 
             <input
               type="password"
-              placeholder="Enter your password"
+              placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[#2a2a2a] text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500 transition"
@@ -125,26 +125,26 @@ export default function LoginPage() {
               className="w-full bg-pink-600 hover:bg-pink-700 text-white py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition"
             >
               {isLoading && <Loader2 className="animate-spin" size={18} />}
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? 'Registering...' : 'Register'}
             </button>
           </form>
 
           <button
-            onClick={handleGoogleLogin}
+            onClick={handleGoogleSignIn}
             disabled={isLoading}
             className="w-full flex items-center justify-center gap-3 border border-gray-300 dark:border-gray-700 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] transition text-gray-700 dark:text-white"
           >
             {isLoading ? <Loader2 className="animate-spin" size={18} /> : <FcGoogle size={20} />}
-            {isLoading ? 'Signing in...' : 'Sign in with Google'}
+            {isLoading ? 'Signing up...' : 'Sign up with Google'}
           </button>
 
           <p className="text-sm text-center text-gray-600 dark:text-gray-400">
-            Don’t have an account?{' '}
+            Already have an account?{' '}
             <a
-              href="/register"
+              href="/"
               className="text-pink-600 underline hover:text-pink-700 dark:hover:text-pink-400 transition"
             >
-              Register here
+              Login here
             </a>
           </p>
         </div>
