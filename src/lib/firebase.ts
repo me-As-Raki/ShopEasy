@@ -7,14 +7,15 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 
 // ✅ Firebase Config
 const firebaseConfig = {
-  apiKey: "AIzaSyD3GZYl-9d3mH9UzoOHDPSftGTlcfojkr0",
-  authDomain: "shop-easy-ac7ce.firebaseapp.com",
-  projectId: "shop-easy-ac7ce",
-  storageBucket: "shop-easy-ac7ce.appspot.com", // ✅ Fixed: .app not storage domain
-  messagingSenderId: "203480695350",
-  appId: "1:203480695350:web:d42521dc38322b0323ce97",
-  measurementId: "G-HGLFX7MFQH",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID!,
 };
+
 
 // ✅ Initialize Firebase
 const app = initializeApp(firebaseConfig);
