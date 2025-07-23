@@ -1,21 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { db, auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import {
   collection,
-  getDocs,
-  addDoc,
   doc,
+  getDocs,
   deleteDoc,
+  addDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import {
+  IndianRupee,
   CreditCard,
   Truck,
-  IndianRupee,
   Loader2,
   CheckCircle2,
 } from 'lucide-react';
@@ -23,7 +23,6 @@ import {
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'CARD' | 'COD'>('UPI');
@@ -35,7 +34,7 @@ export default function CheckoutPage() {
   const isBuyNow = searchParams.get('buynow') === 'true';
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchItems = async () => {
       const user = auth.currentUser;
       if (!user) {
         router.push('/');
@@ -43,38 +42,40 @@ export default function CheckoutPage() {
       }
 
       try {
-        if (isBuyNow) {
-          const stored = localStorage.getItem('buynow-item');
-          if (stored) {
-            const product = JSON.parse(stored);
+        if (typeof window !== 'undefined' && isBuyNow) {
+          const storedItem = localStorage.getItem('buynow-item');
+          if (storedItem) {
+            const product = JSON.parse(storedItem);
             setItems([{ ...product, quantity: 1 }]);
           } else {
-            toast.error('No product found');
+            toast.error('No Buy Now item found');
             router.push('/products');
           }
         } else {
           const cartRef = collection(db, 'carts', user.uid, 'items');
           const snap = await getDocs(cartRef);
-          setItems(snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
+          const cartItems = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+          setItems(cartItems);
         }
       } catch (err) {
-        toast.error('Error loading products.');
+        toast.error('Failed to load checkout items');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchItems();
   }, []);
 
   const total = items.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
+
   const deliveryDate = new Date();
   deliveryDate.setDate(deliveryDate.getDate() + 4);
 
-  const createOrder = async () => {
+  const placeOrder = async () => {
     const user = auth.currentUser;
     if (!user) {
-      toast.error('Login required');
+      toast.error('You need to log in');
       return;
     }
 
@@ -91,17 +92,17 @@ export default function CheckoutPage() {
       });
 
       if (!isBuyNow) {
-        const cartCol = collection(db, 'carts', user.uid, 'items');
+        const cartRef = collection(db, 'carts', user.uid, 'items');
         for (const item of items) {
-          await deleteDoc(doc(cartCol, item.id));
+          await deleteDoc(doc(cartRef, item.id));
         }
       }
 
-      setOrderPlaced(true);
       setOrderId(orderRef.id);
+      setOrderPlaced(true);
       toast.success('Order placed!');
     } catch (err) {
-      toast.error('Order failed.');
+      toast.error('Failed to place order');
     } finally {
       setPlacingOrder(false);
       setConfirmVisible(false);
@@ -116,34 +117,30 @@ export default function CheckoutPage() {
     );
   }
 
-if (orderPlaced) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#10002B] text-center px-4">
-      <div className="max-w-md bg-gray-100 dark:bg-[#1a1a2e] p-6 rounded-lg shadow-lg space-y-4">
-        <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Order Confirmed!</h2>
-        <p className="text-gray-700 dark:text-gray-300">
-          Your order has been placed successfully.
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Estimated delivery by <span className="font-medium">{deliveryDate.toDateString()}</span>
-        </p>
-        <button
-          onClick={() => router.push('/orders')} // 👈 updated this line
-          className="mt-4 px-6 py-2 bg-pink-600 text-white rounded-lg"
-        >
-          View My Orders
-        </button>
+  if (orderPlaced) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md text-center bg-gray-100 dark:bg-[#1a1a2e] p-6 rounded-lg">
+          <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
+          <h2 className="text-xl font-bold mt-4">Order Confirmed</h2>
+          <p className="text-sm mt-2">
+            Delivery by <strong>{deliveryDate.toDateString()}</strong>
+          </p>
+          <button
+            className="mt-6 px-6 py-2 bg-pink-600 text-white rounded-lg"
+            onClick={() => router.push('/orders')}
+          >
+            View My Orders
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-gray-700 dark:text-gray-300">
-        <p>No items found for checkout.</p>
+      <div className="min-h-screen flex flex-col items-center justify-center text-center text-gray-700 dark:text-gray-300">
+        <p>No items available for checkout.</p>
         <button
           onClick={() => router.push('/products')}
           className="mt-4 px-6 py-2 bg-pink-600 text-white rounded-lg"
@@ -155,40 +152,37 @@ if (orderPlaced) {
   }
 
   return (
-    <div className="min-h-screen py-10 px-4 bg-white dark:bg-[#10002B]">
+    <div className="min-h-screen px-4 py-10 bg-white dark:bg-[#10002B]">
       <div className="max-w-4xl mx-auto space-y-8">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Checkout</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Checkout</h1>
 
-        {/* Items List */}
-        <div className="bg-gray-100 dark:bg-[#1a1a2e] p-5 rounded-lg space-y-4">
-          {items.map((item, i) => (
-            <div key={i} className="flex justify-between items-center gap-4">
-              <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover" />
+        {/* Items */}
+        <div className="bg-gray-100 dark:bg-[#1a1a2e] rounded-lg p-5 space-y-4">
+          {items.map((item, index) => (
+            <div key={index} className="flex items-center justify-between gap-4">
+              <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded-lg" />
               <div className="flex-1">
-                <p className="font-semibold text-gray-900 dark:text-white">{item.name}</p>
+                <p className="font-semibold">{item.name}</p>
                 <p className="text-sm text-gray-500">{item.category}</p>
               </div>
-              <p className="text-gray-800 dark:text-gray-300">
-                ₹{item.price} × {item.quantity || 1}
-              </p>
+              <p className="text-sm">₹{item.price} × {item.quantity || 1}</p>
             </div>
           ))}
-          <hr className="my-2 border-gray-300 dark:border-gray-700" />
-          <div className="flex justify-between font-bold text-lg text-gray-800 dark:text-white">
+          <div className="flex justify-between font-bold text-lg mt-2">
             <span>Total</span>
             <span>₹{total}</span>
           </div>
         </div>
 
         {/* Payment Method */}
-        <div className="bg-gray-100 dark:bg-[#1a1a2e] p-5 rounded-lg">
-          <h2 className="font-semibold mb-4 text-gray-800 dark:text-white">Payment Method</h2>
+        <div className="bg-gray-100 dark:bg-[#1a1a2e] p-5 rounded-lg space-y-2">
+          <h2 className="font-semibold">Select Payment Method</h2>
           {['UPI', 'CARD', 'COD'].map(method => {
             const Icon = method === 'UPI' ? IndianRupee : method === 'CARD' ? CreditCard : Truck;
             return (
               <label
                 key={method}
-                className="flex items-center gap-3 p-3 rounded-md cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md"
               >
                 <input
                   type="radio"
@@ -197,20 +191,14 @@ if (orderPlaced) {
                   checked={paymentMethod === method}
                   onChange={() => setPaymentMethod(method as any)}
                 />
-                <Icon className="w-5 h-5 text-pink-600 dark:text-pink-300" />
-                <span className="text-gray-800 dark:text-gray-100">
-                  {method === 'COD'
-                    ? 'Cash on Delivery'
-                    : method === 'UPI'
-                    ? 'UPI Payment'
-                    : 'Card Payment'}
-                </span>
+                <Icon className="w-5 h-5 text-pink-600" />
+                <span>{method === 'COD' ? 'Cash on Delivery' : method}</span>
               </label>
             );
           })}
         </div>
 
-        {/* Place Order Button */}
+        {/* Confirm Order */}
         <button
           onClick={() => setConfirmVisible(true)}
           className="w-full bg-pink-600 hover:bg-pink-700 text-white py-3 rounded-lg text-lg font-semibold"
@@ -219,27 +207,25 @@ if (orderPlaced) {
         </button>
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Modal */}
       {confirmVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-[#1a1a2e] p-6 rounded-xl max-w-sm w-full text-center space-y-4">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Confirm Order</h2>
-            <p className="text-gray-700 dark:text-gray-300">
-              Pay ₹{total} using {paymentMethod}?
-            </p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[#1a1a2e] p-6 rounded-lg w-full max-w-sm space-y-4 text-center">
+            <h2 className="text-xl font-bold">Confirm Order</h2>
+            <p>Pay ₹{total} using {paymentMethod}?</p>
             <div className="flex justify-center gap-4 mt-4">
               <button
                 onClick={() => setConfirmVisible(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                className="px-4 py-2 border rounded-lg"
               >
                 Cancel
               </button>
               <button
-                onClick={createOrder}
+                onClick={placeOrder}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
                 disabled={placingOrder}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
               >
-                {placingOrder ? 'Placing...' : 'Yes, Place Order'}
+                {placingOrder ? 'Placing...' : 'Yes, Confirm'}
               </button>
             </div>
           </div>
